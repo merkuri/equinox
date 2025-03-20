@@ -124,6 +124,9 @@
       autumnEq: { en: "Autumn Equinox!",  al: "Ekuinoksi i Vjeshtës!" }
     };
 
+    // We'll store Earth sphere reference so we can spin it
+    let earthSphereRef = null;
+
     function init(){
       scene = new THREE.Scene();
       camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -170,13 +173,16 @@
       // Make Earth sphere with radius=1, add segments for smoother results
       const earthGeo = new THREE.SphereGeometry(1, 64, 64);
 
-      // Just an ocean-blue color
+      // Darker ocean-blue color
       const earthMat = new THREE.MeshStandardMaterial({
-        color: 0x1E90FF
+        color: 0x174F9B
       });
 
       const earthSphere = new THREE.Mesh(earthGeo, earthMat);
       earthGroup.add(earthSphere);
+
+      // Store reference for spinning
+      earthSphereRef = earthSphere;
 
       // Equator ring
       const eqGeo = new THREE.RingGeometry(0.98,1.0,64);
@@ -319,8 +325,14 @@
     function animate(){
       requestAnimationFrame(animate);
       if(!isPaused && !isEquinoxPause){
+        // increment day
         day+=speed;
         if(day>=365) day-=365;
+
+        // spin the Earth on its own axis
+        if(earthSphereRef){
+          earthSphereRef.rotation.y += 0.02; // Adjust spin speed as desired
+        }
       }
       updateEarthPositionAndTilt(day);
       checkEquinoxAutoPause(day);
