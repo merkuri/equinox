@@ -1,255 +1,284 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <!-- Let your simulation scale gracefully, like the orbits of heavenly bodies -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Equinox 3D Simulation</title>
+  <meta charset="UTF-8" />
+  <title>3D Equinox Simulation (N-S Markers, Equinox Pause)</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <style>
-    body {
-      margin: 0;
-      padding: 10px;
-      font-family: sans-serif;
-      background: #f0f0f0;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-    }
-    #simulationContainer {
-      flex: 1 1 600px;
-      text-align: center;
-    }
-    #simulationCanvasContainer {
-      border: 1px solid #ccc;
-      background: #fff;
-      max-width: 600px;
-      width: 100%;
-      height: 600px;
-      margin: auto;
-    }
+    body { margin: 0; overflow: hidden; background: #000; }
     .controls {
-      margin-top: 10px;
+      position: absolute; top: 10px; left: 10px;
+      background: rgba(0,0,0,0.5); padding: 10px; border-radius: 5px;
     }
     button {
-      margin: 5px;
-      padding: 10px 15px;
-      font-size: 16px;
-      cursor: pointer;
+      margin: 5px; padding: 8px 12px; font-size: 14px; cursor: pointer;
     }
-    #legend {
-      flex: 1 1 250px;
-      background: #fff;
-      border: 1px solid #ccc;
-      padding: 10px;
-      margin-left: 20px;
-      max-width: 250px;
-      height: fit-content;
-      font-size: 14px;
-    }
-    @media (max-width: 700px) {
-      #legend {
-        margin-left: 0;
-        margin-top: 20px;
-      }
+    /* Large Equinox Caption */
+    #equinoxCaption {
+      position: absolute;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 48px;
+      color: magenta;
+      text-shadow: 2px 2px 4px #000;
+      display: none; /* hidden by default */
     }
   </style>
 </head>
 <body>
-  <div id="simulationContainer">
-    <h1 id="title">Equinox 3D Simulation</h1>
-    <div id="simulationCanvasContainer"></div>
-    <div class="controls">
-      <button id="togglePlay">Pause</button>
-      <button id="stepButton">Step</button>
-      <button id="fasterButton">Faster</button>
-      <button id="slowerButton">Slower</button>
-      <button id="langToggle"><span id="langFlag">🇦🇱</span></button>
-    </div>
+  <div class="controls">
+    <button id="pauseResume">Pause</button>
+    <button id="stepWeek">Step (1 week)</button>
+    <button id="increaseSpeed">Faster</button>
+    <button id="decreaseSpeed">Slower</button>
   </div>
-  <div id="legend">
-    <h3>Legend / Commands</h3>
-    <ul>
-      <li><strong>Play/Pause:</strong> Toggle simulation (or tap once when running to pause).</li>
-      <li><strong>Step:</strong> Advance one step when paused.</li>
-      <li><strong>Faster/Slower:</strong> Adjust simulation speed.</li>
-      <li><strong>Language:</strong> Switch between English and Albanian.</li>
-    </ul>
-  </div>
+  <div id="equinoxCaption">Equinox!</div>
 
-  <!-- Include Three.js (and optionally OrbitControls for free camera movement) -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <script src="https://threejs.org/examples/js/controls/OrbitControls.js"></script>
   <script>
-    // Set up the 3D scene—a cosmic stage for our Earth–Sun dance.
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf0f0f0);
-
-    const camera = new THREE.PerspectiveCamera(45, 600/600, 0.1, 1000);
-    camera.position.set(0, 150, 400);
-    camera.lookAt(0, 0, 0);
-
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(600, 600);
-    document.getElementById("simulationCanvasContainer").appendChild(renderer.domElement);
-
-    // OrbitControls let you wander among the stars (or at least around our scene)
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-
-    // Create the Sun—a radiant sphere at the center.
-    const sunGeometry = new THREE.SphereGeometry(15, 32, 32);
-    const sunMaterial = new THREE.MeshBasicMaterial({ color: 0xffa500 });
-    const sunMesh = new THREE.Mesh(sunGeometry, sunMaterial);
-    scene.add(sunMesh);
-
-    // Add a point light at the Sun's position so our Earth glows with gentle luminescence.
-    const sunLight = new THREE.PointLight(0xffffff, 1.5, 0);
-    sunLight.position.set(0, 0, 0);
-    scene.add(sunLight);
-
-    // Draw Earth's orbital path (a perfect circle in the xz–plane).
-    const orbitRadius = 200;
-    const orbitCurve = new THREE.EllipseCurve(
-      0, 0,                // ax, aY (center of the orbit)
-      orbitRadius, orbitRadius,  // xRadius, yRadius
-      0, 2 * Math.PI,      // startAngle, endAngle
-      false, 0
-    );
-    const orbitPoints = orbitCurve.getPoints(64);
-    const orbitGeometry = new THREE.BufferGeometry().setFromPoints(
-      orbitPoints.map(p => new THREE.Vector3(p.x, 0, p.y))
-    );
-    const orbitMaterial = new THREE.LineBasicMaterial({ color: 0xaaaaaa });
-    const orbitLine = new THREE.Line(orbitGeometry, orbitMaterial);
-    scene.add(orbitLine);
-
-    // Build a group to control Earth's orbital motion.
-    const earthOrbit = new THREE.Group();
-    scene.add(earthOrbit);
-
-    // The earthGroup will handle axial tilt. Position it at (orbitRadius, 0, 0)
-    // so that when the earthOrbit rotates, Earth follows its orbit around the Sun.
-    const earthGroup = new THREE.Group();
-    earthGroup.position.set(orbitRadius, 0, 0);
-    earthOrbit.add(earthGroup);
-
-    // Draw the North–South axis as a red line (its length is exaggerated for clarity).
-    const axisLength = 30 * 1.5;  // earthRadius * tiltExaggeration
-    const nsAxisGeometry = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, axisLength, 0),
-      new THREE.Vector3(0, -axisLength, 0)
-    ]);
-    const nsAxisMaterial = new THREE.LineBasicMaterial({ color: 0xff0000 });
-    const nsAxisLine = new THREE.Line(nsAxisGeometry, nsAxisMaterial);
-    earthGroup.add(nsAxisLine);
-
-    // Create a pivot for Earth's self–rotation.
-    const earthPivot = new THREE.Group();
-    earthGroup.add(earthPivot);
-
-    // Create the Earth as a blue sphere.
-    const earthRadius = 30;
-    const earthGeometry = new THREE.SphereGeometry(earthRadius, 32, 32);
-    const earthMaterial = new THREE.MeshPhongMaterial({ color: 0x0000ff, shininess: 50 });
-    const earthMesh = new THREE.Mesh(earthGeometry, earthMaterial);
-    earthPivot.add(earthMesh);
-
-    // Draw the equator as a white circle.
-    // Instead of modifying vertices (which is deprecated), we create the circle from scratch.
-    const segments = 64;
-    const equatorPoints = [];
-    for (let i = 0; i <= segments; i++){
-      const theta = (i / segments) * Math.PI * 2;
-      equatorPoints.push(new THREE.Vector3(earthRadius * Math.cos(theta), 0, earthRadius * Math.sin(theta)));
-    }
-    const equatorGeometry = new THREE.BufferGeometry().setFromPoints(equatorPoints);
-    const equatorMaterial = new THREE.LineBasicMaterial({ color: 0xffffff });
-    const equatorLine = new THREE.LineLoop(equatorGeometry, equatorMaterial);
-    earthPivot.add(equatorLine);
-
-    // A small black marker on the equator shows Earth's self–rotation.
-    const markerGeometry = new THREE.SphereGeometry(2, 16, 16);
-    const markerMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
-    const markerMesh = new THREE.Mesh(markerGeometry, markerMaterial);
-    markerMesh.position.set(earthRadius, 0, 0);
-    earthPivot.add(markerMesh);
-
-    // Simulation state variables: a day counter, speed, and the spin of our blue orb.
-    let day = 80;  // Start near the spring equinox
-    let speed = 0.5;  // Days per frame
+    // Scene variables
+    let scene, camera, renderer, controls;
+    let sunMesh, earthGroup, equatorRing, nsLine, nLabel, sLabel, sunRay, orbitPath;
     let isPaused = false;
-    let earthSpin = 0;  // Earth's self rotation (in radians)
-    const maxTilt = 23.5 * Math.PI / 180;  // Earth's tilt in radians
+    let isEquinoxPause = false; // short forced pause at equinox
+    let lastEquinoxTriggered = -999; // keep track so we don't re-trigger the same day
 
-    // For the bilingual soul
-    let language = "en";
+    // Earth orbit radius (XZ-plane)
+    const ORBIT_RADIUS = 15;
+    // Maximum tilt (~23.5° in radians)
+    const maxTilt = 23.5 * Math.PI / 180;
+    // Simulation day [0..365)
+    let day = 0;
+    // Speed: days/frame
+    let speed = 0.5;
 
-    // The animation loop—a cosmic waltz updating orbital and axial rotations.
-    function animate() {
+    function init() {
+      scene = new THREE.Scene();
+
+      camera = new THREE.PerspectiveCamera(
+        70,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        1000
+      );
+      camera.position.set(30,15,30);
+
+      renderer = new THREE.WebGLRenderer({ antialias:true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.target.set(0,0,0);
+      controls.update();
+
+      // =========== LIGHTS ===========
+      const pointLight = new THREE.PointLight(0xffffff, 2, 100);
+      pointLight.position.set(0,0,0); // at Sun
+      scene.add(pointLight);
+
+      const dirLight = new THREE.DirectionalLight(0xffffff,1.2);
+      dirLight.position.set(10,20,10);
+      scene.add(dirLight);
+
+      const ambient = new THREE.AmbientLight(0xffffff,0.3);
+      scene.add(ambient);
+
+      // =========== SUN ===========
+      const sunGeo = new THREE.SphereGeometry(2,32,32);
+      const sunMat = new THREE.MeshBasicMaterial({ color:0xffaa00 });
+      sunMesh = new THREE.Mesh(sunGeo, sunMat);
+      scene.add(sunMesh);
+
+      // =========== ORBIT PATH (XZ-plane) ===========
+      const orbitGeo = new THREE.TorusGeometry(ORBIT_RADIUS,0.05,16,100);
+      const orbitMat = new THREE.MeshBasicMaterial({ color:0xffffff });
+      orbitPath = new THREE.Mesh(orbitGeo, orbitMat);
+      orbitPath.rotation.x = Math.PI/2; // put ring in XZ-plane
+      scene.add(orbitPath);
+
+      // =========== EARTH GROUP ===========
+      // This group holds all Earth items (sphere, equator, axis, labels).
+      earthGroup = new THREE.Group();
+      scene.add(earthGroup);
+
+      // =========== EARTH SPHERE (radius=1) ===========
+      const earthGeo = new THREE.SphereGeometry(1,32,32);
+      const earthMat = new THREE.MeshStandardMaterial({ color:0x0000ff });
+      const earthSphere = new THREE.Mesh(earthGeo, earthMat);
+      earthGroup.add(earthSphere);
+
+      // =========== EQUATOR RING (radius ~1) ===========
+      const eqGeo = new THREE.RingGeometry(0.98,1.0,64);
+      const eqMat = new THREE.LineBasicMaterial({ color:0xff0000 });
+      equatorRing = new THREE.LineLoop(eqGeo, eqMat);
+      // ring geometry is in XY-plane => rotate so local Y is axis => we want local XZ-plane
+      equatorRing.rotation.x = Math.PI/2;
+      earthGroup.add(equatorRing);
+
+      // =========== N-S AXIS LINE ===========
+      // from (0,+1.2,0) to (0,-1.2,0) => local Y
+      const nsPoints = [
+        new THREE.Vector3(0,1.2,0),
+        new THREE.Vector3(0,-1.2,0)
+      ];
+      const nsGeo = new THREE.BufferGeometry().setFromPoints(nsPoints);
+      const nsMat = new THREE.LineBasicMaterial({ color:0xffffff });
+      nsLine = new THREE.Line(nsGeo, nsMat);
+      earthGroup.add(nsLine);
+
+      // =========== N & S TEXT LABELS ===========
+      // We'll create small sprites or planes with letters "N" and "S" near the axis ends.
+      // For simplicity, let's do small white text geometry or planes. We'll do basic sprites.
+      nLabel = createTextSprite("N", 0xffffff);
+      sLabel = createTextSprite("S", 0xffffff);
+      nLabel.position.set(0,1.4,0);
+      sLabel.position.set(0,-1.4,0);
+      earthGroup.add(nLabel);
+      earthGroup.add(sLabel);
+
+      // =========== DASHEd SUN RAY ===========
+      const rayGeo = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0,0,0),
+        new THREE.Vector3(ORBIT_RADIUS,0,0)
+      ]);
+      const rayMat = new THREE.LineDashedMaterial({ color:0xffff00, dashSize:0.5, gapSize:0.5 });
+      sunRay = new THREE.Line(rayGeo, rayMat);
+      sunRay.computeLineDistances();
+      scene.add(sunRay);
+
+      // =========== UI BUTTONS ===========
+      document.getElementById('pauseResume').onclick = togglePause;
+      document.getElementById('stepWeek').onclick = stepWeek;
+      document.getElementById('increaseSpeed').onclick = ()=> speed*=1.2;
+      document.getElementById('decreaseSpeed').onclick = ()=> speed/=1.2;
+    }
+
+    // Create a simple text sprite showing a letter
+    function createTextSprite(letter, color) {
+      // Create a canvas with the letter
+      const canvas = document.createElement('canvas');
+      canvas.width = 64; canvas.height=64;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#000'; // black background
+      ctx.fillRect(0,0,64,64);
+      ctx.fillStyle = '#fff'; // white text
+      ctx.font = '48px sans-serif';
+      ctx.textAlign='center';
+      ctx.textBaseline='middle';
+      ctx.fillText(letter,32,32);
+      // Now create a texture
+      const texture = new THREE.CanvasTexture(canvas);
+      const spriteMat = new THREE.SpriteMaterial({ map:texture, color:color });
+      const sprite = new THREE.Sprite(spriteMat);
+      // Scale the sprite down
+      sprite.scale.set(0.5,0.5,0.5);
+      return sprite;
+    }
+
+    // If user is paused, step one week (7 days)
+    function stepWeek(){
+      if(isPaused && !isEquinoxPause){
+        day +=7;
+        if(day>=365) day-=365;
+      }
+    }
+
+    // Toggle user pause
+    function togglePause(){
+      // If currently auto paused for equinox, do nothing
+      if(isEquinoxPause) return;
+      isPaused=!isPaused;
+      document.getElementById('pauseResume').textContent = isPaused?'Resume':'Pause';
+    }
+
+    function animate(){
       requestAnimationFrame(animate);
 
-      if (!isPaused) {
+      if(!isPaused && !isEquinoxPause){
         day += speed;
-        if (day >= 365) day -= 365;
-        earthSpin += 0.1;
+        if(day>=365) day-=365;
       }
 
-      // Earth's orbital position (rotation around the Sun)
-      const orbitalAngle = 2 * Math.PI * (day / 365);
-      earthOrbit.rotation.y = orbitalAngle;
+      updateEarthPositionAndTilt(day);
+      checkEquinoxAutoPause(day);
 
-      // Compute effective tilt (mimicking seasonal variation)
-      const effectiveTilt = maxTilt * Math.sin(2 * Math.PI * ((day - 80) / 365));
-      // Rotate the earthGroup about its local Z–axis so that the N–S axis tilts only within
-      // the plane formed by the N–S axis and the Sun–Earth line (here, always perpendicular to the orbital plane)
-      earthGroup.rotation.z = effectiveTilt;
-
-      // Self–rotation: spin the Earth about its own (tilted) axis.
-      earthPivot.rotation.y = earthSpin;
-
-      renderer.render(scene, camera);
+      controls.update();
+      renderer.render(scene,camera);
     }
+
+    // Reposition Earth, compute tilt, reorient Earth group so that plane(N–S, Earth->Sun) is perp to XZ
+    function updateEarthPositionAndTilt(day){
+      // Earth in XZ-plane => (ex,0,ez)
+      const orbitAngle = 2*Math.PI*(day/365);
+      const ex = ORBIT_RADIUS*Math.cos(orbitAngle);
+      const ez = ORBIT_RADIUS*Math.sin(orbitAngle);
+      earthGroup.position.set(ex,0,ez);
+
+      // tilt alpha in [-23.5°, +23.5°]
+      const alpha = maxTilt * Math.sin(2*Math.PI*((day-80)/365));
+
+      // We'll define N => Nx,Ny,Nz so that plane(N, ES) is perp to XZ plane => cross(ES,N).y=0 => Nx:Nz=ex:ez
+      // Also angle(N,y)= alpha => N dot y= cos alpha => Ny= cos alpha
+      const lenXZ = Math.sqrt(ex*ex + ez*ez) || 1e-6;
+      let Nx=0, Ny=0, Nz=0;
+      if(lenXZ>1e-6){
+        Nx = ( ex/lenXZ ) * Math.sin(alpha);
+        Nz = ( ez/lenXZ ) * Math.sin(alpha);
+      }
+      Ny = Math.cos(alpha);
+
+      // normalize
+      const Nvec = new THREE.Vector3(Nx,Ny,Nz).normalize();
+      // Make EarthGroup's local Y => Nvec
+      const fromVec = new THREE.Vector3(0,1,0);
+      const quat = new THREE.Quaternion().setFromUnitVectors(fromVec, Nvec);
+      earthGroup.quaternion.copy(quat);
+
+      // Update dashed sunRay from (0,0,0) to Earth
+      sunRay.geometry.setFromPoints([
+        new THREE.Vector3(0,0,0),
+        new THREE.Vector3(ex,0,ez)
+      ]);
+      sunRay.geometry.attributes.position.needsUpdate = true;
+      sunRay.computeLineDistances();
+    }
+
+    function checkEquinoxAutoPause(day){
+      // We'll consider day=80 or day=263 as approximate equinox days
+      const eqList=[80,263]; // ~spring eq, ~autumn eq
+      const today = Math.floor(day); // integer
+      if(!isEquinoxPause && !isPaused){
+        if(eqList.includes(today) && today!==lastEquinoxTriggered){
+          // auto pause
+          lastEquinoxTriggered = today;
+          isEquinoxPause=true;
+          isPaused=true;
+          document.getElementById('pauseResume').textContent='Resume';
+          // show 'Equinox!'
+          const eqCap = document.getElementById('equinoxCaption');
+          eqCap.style.display='block';
+          setTimeout(()=>{
+            eqCap.style.display='none';
+            isEquinoxPause=false;
+            // auto resume after 1.5s
+            isPaused=false;
+            document.getElementById('pauseResume').textContent='Pause';
+          },1500);
+        }
+      }
+    }
+
+    // Initialize & Animate
+    init();
     animate();
 
-    // Handle window resizes (the heavens adapt as we do).
-    window.addEventListener('resize', function(){
-      const width = 600;
-      const height = 600;
-      renderer.setSize(width, height);
-      camera.aspect = width / height;
+    window.addEventListener('resize',()=>{
+      camera.aspect = window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
-    });
-
-    // Button controls—because even cosmic simulations appreciate a little user guidance.
-    document.getElementById("togglePlay").addEventListener("click", function () {
-      isPaused = !isPaused;
-      this.textContent = isPaused 
-        ? (language === "en" ? "Resume" : "Vazhdo")
-        : (language === "en" ? "Pause" : "Ndalo");
-    });
-    document.getElementById("stepButton").addEventListener("click", function () {
-      if (isPaused) {
-        day += speed;
-        if (day >= 365) day -= 365;
-      }
-    });
-    document.getElementById("fasterButton").addEventListener("click", function () {
-      speed *= 2;
-    });
-    document.getElementById("slowerButton").addEventListener("click", function () {
-      speed /= 2;
-    });
-    document.getElementById("langToggle").addEventListener("click", function () {
-      language = (language === "en") ? "al" : "en";
-      document.getElementById("togglePlay").textContent = isPaused 
-        ? (language === "en" ? "Resume" : "Vazhdo")
-        : (language === "en" ? "Pause" : "Ndalo");
-      document.getElementById("stepButton").textContent = (language === "en") ? "Step" : "Hapi";
-      document.getElementById("fasterButton").textContent = (language === "en") ? "Faster" : "Më shpejt";
-      document.getElementById("slowerButton").textContent = (language === "en") ? "Slower" : "Më ngadalë";
-      document.getElementById("title").textContent = (language === "en")
-        ? "Equinox 3D Simulation"
-        : "Simulimi 3D i Ekuinoksit";
-      document.getElementById("langFlag").textContent = (language === "en") ? "🇦🇱" : "🇬🇧";
+      renderer.setSize(window.innerWidth, window.innerHeight);
     });
   </script>
 </body>
