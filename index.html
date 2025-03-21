@@ -3,7 +3,7 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta charset="UTF-8" />
-  <title>3D Equinox Simulation (Ellipse Trail, Smaller Sun Label, Friendly Font)</title>
+  <title>3D Equinox Simulation (with Reference Axis & Help)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <style>
@@ -21,11 +21,11 @@
       border-radius: 5px;
       z-index: 10;
       font-family: Arial, sans-serif;
-      font-size: 18px;
+      font-size: 16px;
     }
     button {
       margin: 5px;
-      padding: 12px 16px;
+      padding: 12px 18px;
       font-size: 1.1rem;
       cursor: pointer;
       font-family: inherit;
@@ -47,7 +47,7 @@
       top: 40%;
       left: 50%;
       transform: translate(-50%, -50%);
-      font-size: 48px;
+      font-size: 24px;
       color: magenta;
       text-shadow: 2px 2px 4px #000;
       display: none;
@@ -66,6 +66,29 @@
       z-index: 10;
       font-family: Arial, sans-serif;
     }
+
+    /* Help panel styling */
+    #helpPanel {
+      position: absolute;
+      top: 60px;
+      left: 10px;
+      width: 300px;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      font-size: 14px;
+      font-family: Arial, sans-serif;
+      padding: 10px;
+      border-radius: 5px;
+      z-index: 20;
+      display: none; /* hidden by default */
+    }
+    #helpPanel h2 {
+      margin: 0 0 8px;
+    }
+    #helpPanel p {
+      margin: 8px 0;
+      line-height: 1.4em;
+    }
   </style>
 </head>
 <body>
@@ -75,9 +98,12 @@
     <button id="increaseSpeed">Faster</button>
     <button id="decreaseSpeed">Slower</button>
     <button id="toggleLang">🇬🇧</button>
+    <button id="helpBtn">Help</button>
   </div>
+
   <div id="dayDateCaption"></div>
   <div id="equinoxCaption"></div>
+  <div id="helpPanel"></div>
   <div id="signature">
     Merkur Beqiri, Mar 20th 2025 – <em>Equinox simulation in JS</em> – merkur@gmail.com
   </div>
@@ -85,20 +111,20 @@
   <script>
     let scene, camera, renderer, controls;
     let sunMesh, sunLabel, earthGroup, equatorRing, nsLine, nLabel, sLabel, sunRay;
-    let ellipseLine; // for ellipse trail
+    let ellipseLine; // orbit trail
     let isPaused = false;
     let isEquinoxPause = false;
     let lastEquinoxTriggered = -999;
     let day = 0;
     let speed = 0.5;
 
-    // Elliptical orbit parameters
-    const a = 15;        // semi-major axis
-    const e = 0.02;      // eccentricity
-    // day=172 => aphelion => E=pi
+    // For elliptical orbit
+    const a = 15;     // semi-major axis
+    const e = 0.02;   // eccentricity
+    // day=172 => E=π => aphelion
 
-    // Reversed sign tilt
-    const maxTilt = 23.5 * Math.PI / 180;
+    // Earth's tilt
+    const maxTilt = 23.5 * Math.PI / 180; // reversed sign later
 
     // Equinox days
     const eqSpring = 80;
@@ -112,20 +138,47 @@
     const monthNames_en = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const monthNames_al = ["Jan","Shk","Mar","Pri","Maj","Qer","Kor","Gus","Sht","Tet","Nën","Dhj"];
 
-    // UI Strings
-    const UIStrings = {
-      pause:    { en: "Pause",  al: "Ndalo" },
-      resume:   { en: "Resume", al: "Vazhdo" },
-      stepWeek: { en: "Step (1 week)", al: "Hapi (1 javë)" },
-      faster:   { en: "Faster", al: "Më shpejt" },
-      slower:   { en: "Slower", al: "Më ngadalë" },
-      dayLabel: { en: "Day",    al: "Dita" },
-      springEq: { en: "Spring Equinox!",  al: "Ekuinoksi i Pranverës!" },
-      autumnEq: { en: "Autumn Equinox!",  al: "Ekuinoksi i Vjeshtës!" }
-    };
-
     // We'll store Earth sphere reference so we can spin it
     let earthSphereRef = null;
+
+    // === UI Strings & help text (English/Albanian) ===
+    const UIStrings = {
+      pause:     { en: "Pause",  al: "Ndalo" },
+      resume:    { en: "Resume", al: "Vazhdo" },
+      stepWeek:  { en: "Step (1 week)", al: "Hapi (1 javë)" },
+      faster:    { en: "Faster", al: "Më shpejt" },
+      slower:    { en: "Slower", al: "Më ngadalë" },
+      dayLabel:  { en: "Day",    al: "Dita" },
+      springEq:  { en: "Spring Equinox!",  al: "Ekuinoksi i Pranverës!" },
+      autumnEq:  { en: "Autumn Equinox!",  al: "Ekuinoksi i Vjeshtës!" },
+      helpBtn:   { en: "Help",   al: "Ndihmë" },
+      helpTitle: { en: "Help & Legend", al: "Ndihmë & Legjenda" },
+      helpText:  {
+        en: "Use the buttons to pause/resume, step by 1 week, or adjust speed.\n" +
+            "Tap once on mobile to pause/resume, double tap to step 1 week.\n" +
+            "The Earth orbits in an ellipse (white circle) and tilts ±23.5° (red axis).\n" +
+            "The dashed axis (cyan) is a reference with zero tilt.\n" +
+            "At equinox, Earth briefly pauses, showing a message.\n" +
+            "Use the 'Lang' button to switch languages.\nEnjoy!",
+        al: "Përdorni butonat për të ndalur/vazhduar, për të hedhur një hap prej 1 jave, ose për të ndryshuar shpejtësinë.\n" +
+            "Në telefon: prekni një herë për ndaluar/vazhduar, prekni dy herë për të hedhur hap 1 javë.\n" +
+            "Toka rrotullohet në formë eliptike (rrathë bardhë) dhe anon ±23.5° (boshti i kuq).\n" +
+            "Boshti me vijë të ndërprerë (ngjyrë qielli) është referencë pa devijim.\n" +
+            "Në ekuinoks, Toka ndalon pak sekonda, duke shfaqur mesazh.\n" +
+            "Butoni 'Lang' ndryshon gjuhën.\nArgëtohu!"
+      },
+      sunLabel:  { en: "Sun",    al: "Diell" },
+      nLabel:    { en: "N",      al: "V" },
+      sLabel:    { en: "S",      al: "J" }
+    };
+
+    // We'll keep references for help toggling
+    let helpShown = false;
+
+    // We also want a reference axis that doesn't tilt
+    // We'll keep it in a separate group that moves with Earth but doesn't rotate with Earth
+    let earthPivot;         // moves with Earth center
+    let refAxisLine;        // dashed line for reference axis
 
     function init(){
       scene = new THREE.Scene();
@@ -160,29 +213,20 @@
       sunMesh = new THREE.Mesh(sunGeo, sunMat);
       scene.add(sunMesh);
 
-      // Sun label (smaller)
-      sunLabel = createTextSprite("Sun","#fff", 0.4);
-      sunLabel.position.set(3,2,0);
-      scene.add(sunLabel);
+      // We'll create the Earth pivot for the reference axis line
+      earthPivot = new THREE.Group();
+      scene.add(earthPivot);
 
-      // Earth group
+      // Earth group (tilts)
       earthGroup = new THREE.Group();
-      scene.add(earthGroup);
+      earthPivot.add(earthGroup);
 
       // Earth sphere
-      // Make Earth sphere with radius=1, add segments for smoother results
-      const earthGeo = new THREE.SphereGeometry(1, 64, 64);
-
-      // Darker ocean-blue color
-      const earthMat = new THREE.MeshStandardMaterial({
-        color: 0x174F9B
-      });
-
+      const earthGeo = new THREE.SphereGeometry(1,64,64);
+      const earthMat = new THREE.MeshStandardMaterial({ color: 0x174F9B }); // dark ocean-blue
       const earthSphere = new THREE.Mesh(earthGeo, earthMat);
       earthGroup.add(earthSphere);
-
-      // Store reference for spinning
-      earthSphereRef = earthSphere;
+      earthSphereRef = earthSphere; // store for spin
 
       // Equator ring
       const eqGeo = new THREE.RingGeometry(0.98,1.0,64);
@@ -191,7 +235,7 @@
       equatorRing.rotation.x = Math.PI/2;
       earthGroup.add(equatorRing);
 
-      // N-S axis
+      // N-S axis (red line)
       const nsPoints = [new THREE.Vector3(0,1.2,0), new THREE.Vector3(0,-1.2,0)];
       const nsGeo = new THREE.BufferGeometry().setFromPoints(nsPoints);
       const nsMat = new THREE.LineBasicMaterial({ color:0xffffff });
@@ -199,37 +243,64 @@
       earthGroup.add(nsLine);
 
       // N & S label sprites
-      nLabel = createTextSprite("N","#fff",0.5);
-      sLabel = createTextSprite("S","#fff",0.5);
+      nLabel = createTextSprite(UIStrings.nLabel[currentLang], "#fff", 0.5);
+      sLabel = createTextSprite(UIStrings.sLabel[currentLang], "#fff", 0.5);
       nLabel.position.set(0,1.4,0);
       sLabel.position.set(0,-1.4,0);
       earthGroup.add(nLabel);
       earthGroup.add(sLabel);
 
+      // Reference axis (does not tilt) in dashed line
+      // We'll attach it to earthPivot (moves with Earth center, no tilt)
+      const refPts = [ new THREE.Vector3(0,1.5,0), new THREE.Vector3(0,-1.5,0) ];
+      const refGeo = new THREE.BufferGeometry().setFromPoints(refPts);
+      const refMat = new THREE.LineDashedMaterial({ color: 0x00ffff, dashSize: 0.2, gapSize: 0.2 });
+      refAxisLine = new THREE.Line(refGeo, refMat);
+      refAxisLine.computeLineDistances();
+      earthPivot.add(refAxisLine);
+
+      // We'll create the sun label now
+      sunLabel = createTextSprite(UIStrings.sunLabel[currentLang], "#fff", 0.9);
+      sunLabel.position.set(3,2,0);
+      scene.add(sunLabel);
+
       // Dashed sun ray
       const rayGeo = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(0,0,0), new THREE.Vector3(1,0,0)
+        new THREE.Vector3(0,0,0),
+        new THREE.Vector3(1,0,0) // we'll update dynamically
       ]);
       const rayMat = new THREE.LineDashedMaterial({color:0xffff00, dashSize:0.5, gapSize:0.5});
       sunRay = new THREE.Line(rayGeo, rayMat);
       sunRay.computeLineDistances();
       scene.add(sunRay);
 
-      // Draw the elliptical orbit as a line from multiple points
+      // Draw ellipse
       drawEllipsePath();
 
-      // UI Buttons
+      // Buttons
       document.getElementById('pauseResume').onclick = togglePause;
       document.getElementById('stepWeek').onclick = stepWeek;
       document.getElementById('increaseSpeed').onclick = ()=> speed*=1.2;
       document.getElementById('decreaseSpeed').onclick = ()=> speed/=1.2;
       document.getElementById('toggleLang').onclick = toggleLang;
+      document.getElementById('helpBtn').onclick = toggleHelpPanel;
 
-      updateUIStrings();
       initTouchCommands();
+      updateUIStrings();
     }
 
-    // createTextSprite with adjustable scale
+    // Additional panel to show/hide help instructions
+    function toggleHelpPanel(){
+      helpShown = !helpShown;
+      const hp = document.getElementById('helpPanel');
+      if(helpShown){
+        hp.style.display = 'block';
+      } else {
+        hp.style.display = 'none';
+      }
+    }
+
+    // Create a text sprite
     function createTextSprite(txt, color="#fff", scale=0.8){
       const canvas = document.createElement('canvas');
       canvas.width=64; canvas.height=64;
@@ -249,11 +320,11 @@
       return sprite;
     }
 
+    // We create a line by sampling param E from 0..2π
     function drawEllipsePath(){
-      // We create a line by sampling param E from 0..2π
       let ellipsePoints=[];
       let segments=200;
-      const rNumer=a*(1-e*e); // ~14.994 for e=0.02, a=15
+      const rNumer=a*(1-e*e);
       for(let i=0; i<=segments; i++){
         let E = 2*Math.PI*(i/segments);
         let r = rNumer/(1 + e*Math.cos(E));
@@ -267,6 +338,7 @@
       scene.add(ellipseLine);
     }
 
+    // Tactile events
     function initTouchCommands(){
       let lastTapTime=0, tapTimeout=null;
       renderer.domElement.addEventListener('touchstart',(e)=>{
@@ -287,10 +359,10 @@
     }
 
     function togglePause(){
-      if(isEquinoxPause)return;
-      isPaused=!isPaused;
-      document.getElementById('pauseResume').textContent=
-        isPaused? UIStrings.resume[currentLang] : UIStrings.pause[currentLang];
+      if(isEquinoxPause) return;
+      isPaused = !isPaused;
+      document.getElementById('pauseResume').textContent =
+        isPaused ? UIStrings.resume[currentLang] : UIStrings.pause[currentLang];
     }
 
     function stepWeek(){
@@ -302,36 +374,73 @@
     }
 
     function toggleLang(){
-      currentLang=(currentLang==='en')?'al':'en';
+      currentLang = (currentLang==='en') ? 'al' : 'en';
       updateUIStrings();
     }
 
+    // Update all UI labels and the help text based on currentLang
     function updateUIStrings(){
-      document.getElementById('pauseResume').textContent=
-        isPaused? UIStrings.resume[currentLang]:UIStrings.pause[currentLang];
-      document.getElementById('stepWeek').textContent=UIStrings.stepWeek[currentLang];
-      document.getElementById('increaseSpeed').textContent=UIStrings.faster[currentLang];
-      document.getElementById('decreaseSpeed').textContent=UIStrings.slower[currentLang];
+      document.getElementById('pauseResume').textContent =
+        isPaused? UIStrings.resume[currentLang] : UIStrings.pause[currentLang];
+      document.getElementById('stepWeek').textContent = UIStrings.stepWeek[currentLang];
+      document.getElementById('increaseSpeed').textContent = UIStrings.faster[currentLang];
+      document.getElementById('decreaseSpeed').textContent = UIStrings.slower[currentLang];
+      document.getElementById('helpBtn').textContent = UIStrings.helpBtn[currentLang];
+
       // Opposite flag
-      const langBtn=document.getElementById('toggleLang');
+      const langBtn = document.getElementById('toggleLang');
       if(currentLang==='en'){
         langBtn.textContent='🇦🇱';
       } else {
         langBtn.textContent='🇬🇧';
       }
+
+      // Day/date
       updateDayDateCaption(day);
+
+      // Help panel text
+      const helpPanel = document.getElementById('helpPanel');
+      let lines = UIStrings.helpText[currentLang].split('\n');
+      let html = `<h2>${UIStrings.helpTitle[currentLang]}</h2>`;
+      lines.forEach(line => {
+        html += `<p>${line}</p>`;
+      });
+      helpPanel.innerHTML = html;
+
+      // Rebuild the Sun & N/S labels with the new language
+      rebuildLabels();
+    }
+
+    // Rebuild Sun, N, S labels if language changed
+    function rebuildLabels(){
+      // Remove old sprites
+      if(sunLabel && sunLabel.parent) sunLabel.parent.remove(sunLabel);
+      if(nLabel && nLabel.parent) nLabel.parent.remove(nLabel);
+      if(sLabel && sLabel.parent) sLabel.parent.remove(sLabel);
+
+      // Build new
+      sunLabel = createTextSprite(UIStrings.sunLabel[currentLang], "#fff", 0.9);
+      sunLabel.position.set(3,2,0);
+      scene.add(sunLabel);
+
+      nLabel = createTextSprite(UIStrings.nLabel[currentLang], "#fff", 0.5);
+      sLabel = createTextSprite(UIStrings.sLabel[currentLang], "#fff", 0.5);
+      nLabel.position.set(0,1.4,0);
+      sLabel.position.set(0,-1.4,0);
+      earthGroup.add(nLabel);
+      earthGroup.add(sLabel);
     }
 
     function animate(){
       requestAnimationFrame(animate);
+
       if(!isPaused && !isEquinoxPause){
-        // increment day
         day+=speed;
         if(day>=365) day-=365;
 
-        // spin the Earth on its own axis
+        // spin Earth
         if(earthSphereRef){
-          earthSphereRef.rotation.y += 0.02; // Adjust spin speed as desired
+          earthSphereRef.rotation.y += 0.02;
         }
       }
       updateEarthPositionAndTilt(day);
@@ -343,79 +452,90 @@
     }
 
     function updateEarthPositionAndTilt(d){
-      // param E => day=172 => E=π => aphelion => a(1-e^2)/(1+ e cosE)
+      // elliptical param
       const E = 2*Math.PI*((d-172)/365);
-      const rNumer=a*(1-e*e);
-      const rDenom=1+ e*Math.cos(E);
-      const r=rNumer/rDenom;
-      const ex=r*Math.cos(E);
-      const ez=r*Math.sin(E);
-      earthGroup.position.set(ex,0,ez);
+      const rNumer = a*(1-e*e);
+      const rDenom = 1+ e*Math.cos(E);
+      const r = rNumer/rDenom;
+      const ex = r*Math.cos(E);
+      const ez = r*Math.sin(E);
 
-      // reversed tilt sign => alpha= -maxTilt sin(...)
-      const alpha=-maxTilt*Math.sin(2*Math.PI*((d-80)/365));
+      // Position the pivot at Earth's center (no rotation)
+      earthPivot.position.set(ex, 0, ez);
 
-      const lenXZ=Math.sqrt(ex*ex + ez*ez)||1e-6;
-      let Nx=0,Ny=0,Nz=0;
+      // reversed tilt => alpha= -maxTilt*sin(...)
+      const alpha = -maxTilt * Math.sin(2*Math.PI*((d-80)/365));
+      // Compute N vector
+      const lenXZ = Math.sqrt(ex*ex + ez*ez)||1e-6;
+      let Nx=0, Ny=0, Nz=0;
       if(lenXZ>1e-6){
-        Nx=(ex/lenXZ)*Math.sin(alpha);
-        Nz=(ez/lenXZ)*Math.sin(alpha);
+        Nx = (ex/lenXZ)*Math.sin(alpha);
+        Nz = (ez/lenXZ)*Math.sin(alpha);
       }
-      Ny=Math.cos(alpha);
+      Ny = Math.cos(alpha);
 
-      const fromVec=new THREE.Vector3(0,1,0);
-      const toVec=new THREE.Vector3(Nx,Ny,Nz).normalize();
-      const quat=new THREE.Quaternion().setFromUnitVectors(fromVec,toVec);
+      // orient EarthGroup => local Y => (Nx,Ny,Nz)
+      const fromVec = new THREE.Vector3(0,1,0);
+      const toVec   = new THREE.Vector3(Nx,Ny,Nz).normalize();
+      const quat    = new THREE.Quaternion().setFromUnitVectors(fromVec, toVec);
       earthGroup.quaternion.copy(quat);
 
-      // sunRay
+      // SunRay: end short of Earth's surface
+      // distance is r, we subtract ~1.1 to stop short
+      const dist = r;
+      let shorten = 1.1; // distance from Earth's center so arrow doesn't overlap sphere
+      if(dist<=shorten) shorten=dist*0.9; // just in case
+      const ratio = (dist - shorten)/dist;
+      const rx = ex*ratio;
+      const rz = ez*ratio;
+
       sunRay.geometry.setFromPoints([
         new THREE.Vector3(0,0,0),
-        new THREE.Vector3(ex,0,ez)
+        new THREE.Vector3(rx,0,rz)
       ]);
-      sunRay.geometry.attributes.position.needsUpdate=true;
+      sunRay.geometry.attributes.position.needsUpdate = true;
       sunRay.computeLineDistances();
     }
 
     function checkEquinoxAutoPause(d){
-      const today=Math.floor(d);
+      const today = Math.floor(d);
       if(!isEquinoxPause && !isPaused){
-        if((today===eqSpring||today===eqAutumn)&& today!==lastEquinoxTriggered){
-          lastEquinoxTriggered=today;
-          isEquinoxPause=true;
-          isPaused=true;
-          document.getElementById('pauseResume').textContent=UIStrings.resume[currentLang];
-          const eqCap=document.getElementById('equinoxCaption');
+        if((today===eqSpring || today===eqAutumn) && today!==lastEquinoxTriggered){
+          lastEquinoxTriggered = today;
+          isEquinoxPause = true;
+          isPaused = true;
+          document.getElementById('pauseResume').textContent = UIStrings.resume[currentLang];
+          const eqCap = document.getElementById('equinoxCaption');
           if(today===eqSpring){
-            eqCap.textContent=UIStrings.springEq[currentLang];
+            eqCap.textContent = UIStrings.springEq[currentLang];
           } else {
-            eqCap.textContent=UIStrings.autumnEq[currentLang];
+            eqCap.textContent = UIStrings.autumnEq[currentLang];
           }
-          eqCap.style.display='block';
+          eqCap.style.display = 'block';
           setTimeout(()=>{
             eqCap.style.display='none';
             isEquinoxPause=false;
             isPaused=false;
-            document.getElementById('pauseResume').textContent=UIStrings.pause[currentLang];
+            document.getElementById('pauseResume').textContent = UIStrings.pause[currentLang];
           },1500);
         }
       }
     }
 
     function updateDayDateCaption(d){
-      const dayInt=Math.floor(d)+1;
-      const dateString=dayToDateString(dayInt,currentLang);
-      const label=(currentLang==='en')? UIStrings.dayLabel.en:UIStrings.dayLabel.al;
-      document.getElementById('dayDateCaption').textContent=`${label} ${dayInt}: ${dateString}`;
+      const dayInt = Math.floor(d)+1;
+      const dateString = dayToDateString(dayInt,currentLang);
+      const label = (currentLang==='en') ? UIStrings.dayLabel.en : UIStrings.dayLabel.al;
+      document.getElementById('dayDateCaption').textContent = `${label} ${dayInt}: ${dateString}`;
     }
 
-    function dayToDateString(dayNum,lang){
-      let m=0,daysLeft=dayNum;
+    function dayToDateString(dayNum, lang){
+      let m=0, daysLeft=dayNum;
       while(m<12 && daysLeft>monthDays[m]){
-        daysLeft-=monthDays[m];
+        daysLeft -= monthDays[m];
         m++;
       }
-      const monthName=(lang==='en')? monthNames_en[m]:monthNames_al[m];
+      const monthName = (lang==='en') ? monthNames_en[m] : monthNames_al[m];
       if(lang==='en'){
         return `${monthName} ${daysLeft}`;
       } else {
@@ -427,7 +547,7 @@
     animate();
 
     window.addEventListener('resize',()=>{
-      camera.aspect=window.innerWidth/window.innerHeight;
+      camera.aspect = window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth,window.innerHeight);
     });
