@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta charset="UTF-8" />
-  <title>3D Equinox Simulation (Ellipse, Bigger Arrow, Reference Axis, Help)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <meta charset="UTF-8"/>
+  <title>3D Equinox Simulation (Ellipse, Reference Axis, Help First)</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <style>
@@ -69,7 +69,7 @@
     /* Help panel styling */
     #helpPanel {
       position: absolute;
-      top: 60px;
+      top: 60px; 
       left: 10px;
       width: 300px;
       background: rgba(0,0,0,0.7);
@@ -92,12 +92,13 @@
 </head>
 <body>
   <div class="controls">
+    <!-- HELP button i pari -->
+    <button id="helpBtn">Help</button>
     <button id="pauseResume">Pause</button>
     <button id="stepWeek">Step (1 week)</button>
     <button id="increaseSpeed">Faster</button>
     <button id="decreaseSpeed">Slower</button>
     <button id="toggleLang">🇦🇱</button>
-    <button id="helpBtn">Help</button>
   </div>
 
   <div id="dayDateCaption"></div>
@@ -109,24 +110,17 @@
 
   <script>
     let scene, camera, renderer, controls;
-
-    // We'll build a group for the Sun->Earth arrow
-    let arrowGroup;        // arrow main group
-    let arrowLine;         // dashed main line
-    let arrowHeadLeft;     // arrow tip line, left
-    let arrowHeadRight;    // arrow tip line, right
-
-    let ellipseLine; 
-    let sunMesh, sunLabel;
-    let earthPivot, earthGroup; 
-    let equatorRing, nsLine, nLabel, sLabel;
+    let arrowGroup, arrowLine, arrowHeadLeft, arrowHeadRight;
+    let ellipseLine, sunMesh, sunLabel;
+    let earthPivot, earthGroup, equatorRing, nsLine, nLabel, sLabel;
+    let refAxisLine; 
     let isPaused = false;
     let isEquinoxPause = false;
     let lastEquinoxTriggered = -999;
     let day = 0;
     let speed = 0.5;
 
-    // More elliptical orbit => e=0.06, day=172 => aphelion => E=π
+    // Elliptical orbit => e=0.06, day=172 => aphelion
     const a = 15;    
     const e = 0.06;  
 
@@ -140,15 +134,12 @@
     // Start in Albanian
     let currentLang = 'al';
 
-    // month data
     const monthDays = [31,28,31,30,31,30,31,31,30,31,30,31];
     const monthNames_en = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
     const monthNames_al = ["Jan","Shk","Mar","Pri","Maj","Qer","Kor","Gus","Sht","Tet","Nën","Dhj"];
 
-    // Earth spin reference
-    let earthSphereRef = null;
+    let earthSphereRef = null; // For spinning
 
-    // UI Strings & help text
     const UIStrings = {
       pause:     { en: "Pause",  al: "Ndalo" },
       resume:    { en: "Resume", al: "Vazhdo" },
@@ -181,13 +172,9 @@
 
     let helpShown = false;
 
-    // Additional groups, lines
-    let refAxisLine; // dashed reference axis
-
-    // main init
     function init(){
       scene = new THREE.Scene();
-      camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 1000);
+      camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight,0.1,1000);
       camera.position.set(30,15,30);
 
       renderer = new THREE.WebGLRenderer({ antialias:true });
@@ -218,11 +205,11 @@
       sunMesh = new THREE.Mesh(sunGeo, sunMat);
       scene.add(sunMesh);
 
-      // Earth pivot (no tilt)
+      // Earth pivot
       earthPivot = new THREE.Group();
       scene.add(earthPivot);
 
-      // Earth group (tilts)
+      // Earth group
       earthGroup = new THREE.Group();
       earthPivot.add(earthGroup);
 
@@ -240,7 +227,7 @@
       equatorRing.rotation.x = Math.PI/2;
       earthGroup.add(equatorRing);
 
-      // N-S axis line (white)
+      // N-S axis
       const nsPoints = [ new THREE.Vector3(0,1.2,0), new THREE.Vector3(0,-1.2,0) ];
       const nsGeo = new THREE.BufferGeometry().setFromPoints(nsPoints);
       const nsMat = new THREE.LineBasicMaterial({ color:0xffffff });
@@ -255,7 +242,7 @@
       earthGroup.add(nLabel);
       earthGroup.add(sLabel);
 
-      // Reference axis (cyan dashed) that doesn't tilt
+      // Reference axis (cyan, dashed)
       const refPts = [ new THREE.Vector3(0,1.5,0), new THREE.Vector3(0,-1.5,0) ];
       const refGeo = new THREE.BufferGeometry().setFromPoints(refPts);
       const refMat = new THREE.LineDashedMaterial({ color:0x00ffff, dashSize:0.2, gapSize:0.2 });
@@ -263,7 +250,7 @@
       refAxisLine.computeLineDistances();
       earthPivot.add(refAxisLine);
 
-      // Build the arrow group
+      // arrow group
       arrowGroup = new THREE.Group();
       scene.add(arrowGroup);
 
@@ -278,11 +265,11 @@
 
       // arrow tip lines
       arrowHeadLeft = makeArrowTipLine(0xffff00);
-      arrowHeadRight = makeArrowTipLine(0xffff00);
+      arrowHeadRight= makeArrowTipLine(0xffff00);
       arrowGroup.add(arrowHeadLeft);
       arrowGroup.add(arrowHeadRight);
 
-      // Build sun label
+      // Sun label
       sunLabel = createTextSprite(UIStrings.sunLabel[currentLang], "#fff", 0.9);
       sunLabel.position.set(3,2,0);
       scene.add(sunLabel);
@@ -290,11 +277,11 @@
       // elliptical path
       drawEllipsePath();
 
-      // UI Buttons
+      // UI
       document.getElementById('pauseResume').onclick = togglePause;
       document.getElementById('stepWeek').onclick = stepWeek;
-      document.getElementById('increaseSpeed').onclick = () => speed *= 1.2;
-      document.getElementById('decreaseSpeed').onclick = () => speed /= 1.2;
+      document.getElementById('increaseSpeed').onclick = ()=> speed*=1.2;
+      document.getElementById('decreaseSpeed').onclick = ()=> speed/=1.2;
       document.getElementById('toggleLang').onclick = toggleLang;
       document.getElementById('helpBtn').onclick = toggleHelpPanel;
 
@@ -316,11 +303,15 @@
       helpShown = !helpShown;
       const hp = document.getElementById('helpPanel');
       hp.style.display = helpShown ? 'block' : 'none';
+      document.getElementById('helpBtn').textContent = helpShown
+        ? (currentLang==='en' ? "Close" : "Mbyll")
+        : UIStrings.helpBtn[currentLang];
     }
 
     function createTextSprite(txt, color="#fff", scale=0.8){
       const canvas = document.createElement('canvas');
-      canvas.width=64; canvas.height=64;
+      canvas.width=64; 
+      canvas.height=64;
       const ctx = canvas.getContext('2d');
       ctx.fillStyle="#000";
       ctx.fillRect(0,0,64,64);
@@ -337,17 +328,16 @@
       return sprite;
     }
 
-    // draw the elliptical path
     function drawEllipsePath(){
       let ellipsePoints=[];
       let segments=200;
-      const rNumer = a*(1-e*e);
+      const rNumer=a*(1-e*e);
       for(let i=0; i<=segments; i++){
         let E = 2*Math.PI*(i/segments);
         let r = rNumer/(1 + e*Math.cos(E));
         let x = r*Math.cos(E);
         let z = r*Math.sin(E);
-        ellipsePoints.push( new THREE.Vector3(x,0,z) );
+        ellipsePoints.push(new THREE.Vector3(x,0,z));
       }
       const ellGeo = new THREE.BufferGeometry().setFromPoints(ellipsePoints);
       const ellMat = new THREE.LineBasicMaterial({ color:0xffffff });
@@ -357,7 +347,7 @@
 
     function initTouchCommands(){
       let lastTapTime=0, tapTimeout=null;
-      renderer.domElement.addEventListener('touchstart', (e)=>{
+      renderer.domElement.addEventListener('touchstart',(e)=>{
         const now=Date.now();
         if(now-lastTapTime<300){
           clearTimeout(tapTimeout);
@@ -400,9 +390,12 @@
       document.getElementById('stepWeek').textContent = UIStrings.stepWeek[currentLang];
       document.getElementById('increaseSpeed').textContent = UIStrings.faster[currentLang];
       document.getElementById('decreaseSpeed').textContent = UIStrings.slower[currentLang];
-      document.getElementById('helpBtn').textContent = UIStrings.helpBtn[currentLang];
 
-      // Opposite flag
+      const helpBtn = document.getElementById('helpBtn');
+      helpBtn.textContent = helpShown
+        ? (currentLang==='en' ? "Close" : "Mbyll")
+        : UIStrings.helpBtn[currentLang];
+
       const langBtn = document.getElementById('toggleLang');
       if(currentLang==='en'){
         langBtn.textContent='🇦🇱';
@@ -416,20 +409,19 @@
     }
 
     function updateHelpPanel(){
-      const helpPanel = document.getElementById('helpPanel');
-      let lines = UIStrings.helpText[currentLang].split('\n');
-      let html = `<h2>${UIStrings.helpTitle[currentLang]}</h2>`;
-      lines.forEach(line => {
-        html += `<p>${line}</p>`;
+      const helpPanel=document.getElementById('helpPanel');
+      let lines=UIStrings.helpText[currentLang].split('\n');
+      let html=`<h2>${UIStrings.helpTitle[currentLang]}</h2>`;
+      lines.forEach(line=>{
+        html+=`<p>${line}</p>`;
       });
-      helpPanel.innerHTML = html;
+      helpPanel.innerHTML=html;
     }
 
-    // Rebuild sun & N/S labels if language changed
     function rebuildLabels(){
       if(sunLabel && sunLabel.parent) sunLabel.parent.remove(sunLabel);
-      if(nLabel && nLabel.parent) nLabel.parent.remove(nLabel);
-      if(sLabel && sLabel.parent) sLabel.parent.remove(sLabel);
+      if(nLabel   && nLabel.parent)   nLabel.parent.remove(nLabel);
+      if(sLabel   && sLabel.parent)   sLabel.parent.remove(sLabel);
 
       sunLabel = createTextSprite(UIStrings.sunLabel[currentLang], "#fff", 0.9);
       sunLabel.position.set(3,2,0);
@@ -449,9 +441,8 @@
         day += speed;
         if(day>=365) day-=365;
 
-        // spin Earth
         if(earthSphereRef){
-          earthSphereRef.rotation.y += 0.02; 
+          earthSphereRef.rotation.y += 0.02;
         }
       }
       updateEarthPositionAndTilt(day);
@@ -462,72 +453,62 @@
       renderer.render(scene,camera);
     }
 
-    // The main function that updates Earth's orbit, tilt, & arrow
     function updateEarthPositionAndTilt(d){
-      // param E => day=172 => E=π => aphelion => a(1-e^2)/(1+ e cosE)
-      const E = 2*Math.PI*((d-172)/365);
-      const rNumer = a*(1-e*e);
-      const rDenom = 1 + e*Math.cos(E);
-      const r = rNumer / rDenom;
-      const ex = r*Math.cos(E);
-      const ez = r*Math.sin(E);
+      const E=2*Math.PI*((d-172)/365);
+      const rNumer=a*(1-e*e);
+      const rDenom=1 + e*Math.cos(E);
+      const r=rNumer/rDenom;
+      const ex=r*Math.cos(E);
+      const ez=r*Math.sin(E);
 
-      // pivot at Earth center
       earthPivot.position.set(ex,0,ez);
 
-      // tilt => alpha= -maxTilt sin(...)
-      const alpha = -maxTilt * Math.sin(2*Math.PI*((d-80)/365));
-      const lenXZ = Math.sqrt(ex*ex + ez*ez) || 1e-6;
-      let Nx=0, Ny=0, Nz=0;
+      const alpha=-maxTilt*Math.sin(2*Math.PI*((d-80)/365));
+      const lenXZ=Math.sqrt(ex*ex + ez*ez)||1e-6;
+      let Nx=0,Ny=0,Nz=0;
       if(lenXZ>1e-6){
-        Nx = (ex/lenXZ)*Math.sin(alpha);
-        Nz = (ez/lenXZ)*Math.sin(alpha);
+        Nx=(ex/lenXZ)*Math.sin(alpha);
+        Nz=(ez/lenXZ)*Math.sin(alpha);
       }
-      Ny = Math.cos(alpha);
+      Ny=Math.cos(alpha);
 
-      // orient EarthGroup => local Y => (Nx,Ny,Nz)
-      const fromVec = new THREE.Vector3(0,1,0);
-      const toVec   = new THREE.Vector3(Nx,Ny,Nz).normalize();
-      const quat    = new THREE.Quaternion().setFromUnitVectors(fromVec, toVec);
+      const fromVec=new THREE.Vector3(0,1,0);
+      const toVec=new THREE.Vector3(Nx,Ny,Nz).normalize();
+      const quat=new THREE.Quaternion().setFromUnitVectors(fromVec,toVec);
       earthGroup.quaternion.copy(quat);
 
-      // === Build the arrow from Sun(0,0,0) to EarthPivot(ex,0,ez) ===
-      // We'll define the arrow length as (r - 1.1) so it doesn't clip Earth
-      let arrowLen = r - 1.1;
+      let arrowLen=r-1.1;
       if(arrowLen<0.3) arrowLen=0.3;
 
-      // main line from (0,0,0) to (arrowLen,0,0)
-      const mainLinePts = [
+      const mainLinePts=[
         new THREE.Vector3(0,0,0),
         new THREE.Vector3(arrowLen,0,0)
       ];
       arrowLine.geometry.setFromPoints(mainLinePts);
       arrowLine.computeLineDistances();
 
-      // arrow tip lines => ±30° around tip
-      const angleRad = 30*(Math.PI/180);
-      const tipLen   = 0.3;
-      const leftX = arrowLen - tipLen*Math.cos(angleRad);
-      const leftY = tipLen*Math.sin(angleRad);
+      const angleRad=30*(Math.PI/180);
+      const tipLen=0.3;
+      const leftX=arrowLen - tipLen*Math.cos(angleRad);
+      const leftY=tipLen*Math.sin(angleRad);
       arrowHeadLeft.geometry.setFromPoints([
         new THREE.Vector3(arrowLen,0,0),
         new THREE.Vector3(leftX,leftY,0)
       ]);
-      const rightX = arrowLen - tipLen*Math.cos(angleRad);
-      const rightY = -tipLen*Math.sin(angleRad);
+      const rightX=arrowLen - tipLen*Math.cos(angleRad);
+      const rightY=-tipLen*Math.sin(angleRad);
       arrowHeadRight.geometry.setFromPoints([
         new THREE.Vector3(arrowLen,0,0),
         new THREE.Vector3(rightX,rightY,0)
       ]);
 
-      // rotate arrow so +X => (ex,0,ez)
       arrowGroup.position.set(0,0,0);
-      let arrowAngle = Math.atan2(ez, ex);
-      arrowGroup.rotation.set(0, -arrowAngle, 0);
+      let arrowAngle=Math.atan2(ez,ex);
+      arrowGroup.rotation.set(0,-arrowAngle,0);
     }
 
     function checkEquinoxAutoPause(d){
-      const today = Math.floor(d);
+      const today=Math.floor(d);
       if(!isEquinoxPause && !isPaused){
         if((today===eqSpring||today===eqAutumn) && today!==lastEquinoxTriggered){
           lastEquinoxTriggered=today;
@@ -552,20 +533,19 @@
     }
 
     function updateDayDateCaption(d){
-      const dayInt = Math.floor(d)+1;
-      const dateString = dayToDateString(dayInt,currentLang);
-      const label = (currentLang==='en') ? UIStrings.dayLabel.en : UIStrings.dayLabel.al;
-      document.getElementById('dayDateCaption').textContent =
-        `${label} ${dayInt}: ${dateString}`;
+      const dayInt=Math.floor(d)+1;
+      const dateString=dayToDateString(dayInt,currentLang);
+      const label=(currentLang==='en')?UIStrings.dayLabel.en:UIStrings.dayLabel.al;
+      document.getElementById('dayDateCaption').textContent=`${label} ${dayInt}: ${dateString}`;
     }
 
-    function dayToDateString(dayNum, lang){
-      let m=0, daysLeft=dayNum;
+    function dayToDateString(dayNum,lang){
+      let m=0,daysLeft=dayNum;
       while(m<12 && daysLeft>monthDays[m]){
-        daysLeft -= monthDays[m];
+        daysLeft-=monthDays[m];
         m++;
       }
-      const monthName = (lang==='en') ? monthNames_en[m] : monthNames_al[m];
+      const monthName=(lang==='en')?monthNames_en[m]:monthNames_al[m];
       if(lang==='en'){
         return `${monthName} ${daysLeft}`;
       } else {
@@ -577,7 +557,7 @@
     animate();
 
     window.addEventListener('resize',()=>{
-      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.aspect=window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth,window.innerHeight);
     });
